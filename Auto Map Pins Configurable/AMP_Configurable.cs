@@ -45,12 +45,24 @@ namespace AMP_Configurable
     public static ConfigEntry<bool> spwnsEnabled;
     public static ConfigEntry<bool> creaturesEnabled;
 
+    public enum WishboneModes
+    {
+      equipped,
+      inventory,
+      disabled
+    }
+
+    public static ConfigEntry<WishboneModes> wishboneMode;
+
     //***PUBLIC VARIABLES***//
     public static bool hasMoved = false;
     public static bool checkingPins = false;
     public static string currEnv = "";
-    public static string[] filterObjectIds;
+    public static string[] filterLogObjectIds;
     public static List<string> uniqueObjectIds = new List<string>();
+    public static string[] hiddenObjectPins;
+    public static string defaultPinConfPath;
+    public static string[] configFiles;
 
     //*** PUBLIC PIN TRACKING VARIABLES ***//
     /** <Dictionary> mtypePins 
@@ -116,6 +128,7 @@ namespace AMP_Configurable
       hidePinTypes = Config.Bind("1. Pins", "hidePinTypes", "",
         new ConfigDescription("Disable individual pin types.\nValue should be a comma seperated list of pin labels.", null,
         new ConfigurationManagerAttributes { Order = 3, DispName = "Disable Pins" }));
+      hiddenObjectPins = hidePinTypes.Value.Split(',');
       savePinTypes = Config.Bind("1. Pins", "savePinTypes", "Crypt,Troll Cave,Sunken Crypt,Frost Cave,Infested Mine",
         new ConfigDescription("These Pin Types will persist on the map after the player as left the area.\nValue should be a comma seperated list of pin types.", null,
         new ConfigurationManagerAttributes { Order = 2, DispName = "Save Pins" }));
@@ -128,19 +141,22 @@ namespace AMP_Configurable
 
       destructablesEnabled = Config.Bind("2. Pins Enable/Disable", "destructablesEnabled", true,
         new ConfigDescription("Enable/Disable pins for\nOres, Trees, and other destructable resource nodes", null,
-        new ConfigurationManagerAttributes { Order = 5, DispName = "Resources" }));
+        new ConfigurationManagerAttributes { Order = 6, DispName = "Resources" }));
       pickablesEnabled = Config.Bind("2. Pins Enable/Disable", "pickablesEnabled", true,
         new ConfigDescription("Enable/Disable pins for\nBerries, Mushrooms, and other pickable items", null,
-        new ConfigurationManagerAttributes { Order = 4, DispName = "Pickables" }));
+        new ConfigurationManagerAttributes { Order = 5, DispName = "Pickables" }));
       locsEnabled = Config.Bind("2. Pins Enable/Disable", "locsEnabled", true,
         new ConfigDescription("Enable/Disable pins for\nCrypts, Troll Caves, and other discoverable locations", null,
-        new ConfigurationManagerAttributes { Order = 3, DispName = "Locations" }));
+        new ConfigurationManagerAttributes { Order = 4, DispName = "Locations" }));
       spwnsEnabled = Config.Bind("2. Pins Enable/Disable", "spwnsEnabled", true,
         new ConfigDescription("Enable/Disable pins for\nGreydwarf nests, Skeleton Bone Piles, and other creature spawners", null,
-        new ConfigurationManagerAttributes { Order = 2, DispName = "Spawners" }));
+        new ConfigurationManagerAttributes { Order = 3, DispName = "Spawners" }));
       creaturesEnabled = Config.Bind("2. Pins Enable/Disable", "creaturesEnabled", true,
         new ConfigDescription("Enable/Disable pins for\nSerpents, and other creatures when they spawn with in range of the player", null,
-        new ConfigurationManagerAttributes { Order = 1, DispName = "Creatures" }));
+        new ConfigurationManagerAttributes { Order = 2, DispName = "Creatures" }));
+      wishboneMode = Config.Bind<WishboneModes>("2. Pins Enable/Disable", "wishboneMode", WishboneModes.equipped,
+        new ConfigDescription("equipped: Wishbone must be equipped to show hidden item pins\ninventory: Wishbone must be in players inventory to show hidden item pins\ndisabled: hidden item pins will always show", null,
+        new ConfigurationManagerAttributes { Order = 1, DispName = "Wishbone Mode" }));
 
       /** Logging Config **/
       loggingEnabled = Config.Bind("3. Logging", "loggingEnabled", false,
@@ -162,16 +178,23 @@ namespace AMP_Configurable
         new ConfigDescription("Enables log output with function timing diagnostics. Used for developer optimization purposes", null,
         new ConfigurationManagerAttributes { Order = 1, DispName = "Enable Debug Diagnostics" }));
 
-      filterObjectIds = objectLogFilter.Value.Split(',');
+      filterLogObjectIds = objectLogFilter.Value.Split(',');
 
       /** Load Pin Type Config from JSON files **/
-      string defaultPinConfPath = ResourceUtils.GetDefaultPinConfig();
-      string[] configFiles = ResourceUtils.GetPinConfigFiles();
+      defaultPinConfPath = ResourceUtils.GetDefaultPinConfig();
+      configFiles = ResourceUtils.GetPinConfigFiles();
       objectPins = new Dictionary<string, PinType>();
       mtypePins = new Dictionary<int, PinType>();
       autoPins = new List<Minimap.PinData>();
+
       if (configFiles != null)
       {
+        FileSystemWatcher watcher = new FileSystemWatcher(Paths.PluginPath);
+        watcher.Filter = "amp_*.json";
+        watcher.IncludeSubdirectories = true;
+        watcher.EnableRaisingEvents = true;
+        watcher.Changed += OnConfigFileChange;
+
         LoadPinsFromConfig(defaultPinConfPath);
         foreach (string confPath in configFiles)
         {
@@ -211,6 +234,19 @@ namespace AMP_Configurable
       }
     }
 
+    public static void OnConfigFileChange(object sender, FileSystemEventArgs e)
+    {
+        if (e.ChangeType != WatcherChangeTypes.Changed) return;
+        Mod.Log.LogDebug($"Config Changed: {Path.GetFileName(e.FullPath)}");
+
+        LoadPinsFromConfig(defaultPinConfPath);
+        foreach (string confPath in configFiles)
+        {
+          if (Path.GetFileName(confPath) == "amp_pin_types.json") continue;
+          LoadPinsFromConfig(confPath);
+        }
+    }
+
     public static void UpdatePinsFromSettings(object sender, SettingChangedEventArgs arg)
     {
       Log.LogDebug($"Setting change detected on {arg.ChangedSetting.Definition.Key}");
@@ -221,7 +257,8 @@ namespace AMP_Configurable
           pinRange.Value = Minimap.instance.m_exploreRadius;
         } else pinRange.Value = 50;
 
-      filterObjectIds = objectLogFilter.Value.Split(',');
+      filterLogObjectIds = objectLogFilter.Value.Split(',');
+      hiddenObjectPins = hidePinTypes.Value.Split(',');
       forcePinRefresh();
     }
 
@@ -233,14 +270,43 @@ namespace AMP_Configurable
       pinTypes = ResourceUtils.LoadPinConfig(confFilePath);
       foreach (PinType pinType in pinTypes.pins)
       {
-        // Load mtype and objectId referance dictionary
-        mtypePins[pinType.type] = pinType;
+        if(!mtypePins.ContainsKey(pinType.type)) {
+          mtypePins[pinType.type] = pinType;
+
+          foreach (string objectId in pinType.object_ids)
+          {
+            Mod.Log.LogDebug($"Adding {objectId.ToLower().Trim()} to pin type dictionary");
+            objectPins[objectId.ToLower().Trim()] = pinType;
+          }
+          continue;
+        }
+        
+        mtypePins[pinType.type].label = pinType.label;
+        mtypePins[pinType.type].icon = pinType.icon;
+        mtypePins[pinType.type].size = pinType.size;
+        mtypePins[pinType.type].minimapSize = pinType.minimapSize;
+        mtypePins[pinType.type].object_ids = pinType.object_ids;        
+
         foreach (string objectId in pinType.object_ids)
         {
-          Mod.Log.LogDebug($"Adding {objectId.ToLower().Trim()} to pin type dictionary");
-          objectPins[objectId.ToLower().Trim()] = pinType;
+          string cleanedObjId = objectId.ToLower().Trim();
+          if (!objectPins.ContainsKey(cleanedObjId))
+          {
+            objectPins[cleanedObjId] = pinType;
+            continue;
+          }
+
+          objectPins[cleanedObjId].label = pinType.label;
+          objectPins[cleanedObjId].icon = pinType.icon;
+          objectPins[cleanedObjId].size = pinType.size;
+          objectPins[cleanedObjId].minimapSize = pinType.minimapSize;
+          objectPins[cleanedObjId].object_ids = pinType.object_ids;
         }
       }
+
+      //Assets.Init();
+
+      forcePinRefresh();
     }
 
     /** Log Class
@@ -276,7 +342,7 @@ namespace AMP_Configurable
 
       public static void LogObject(string type, string name, Vector3 pos)
       {
-        if (!Mod.loggingEnabled.Value || !Mod.objectLogging.Value || filterObjectIds.Contains(name)) return;
+        if (!Mod.loggingEnabled.Value || !Mod.objectLogging.Value || filterLogObjectIds.Contains(name)) return;
         if (!Mod.logKnownPinObjects.Value && Mod.objectPins.ContainsKey(name)) return;
         if (Mod.onlyLogUnique.Value && !Mod.uniqueObjectIds.Contains(name))
         {
@@ -314,15 +380,15 @@ namespace AMP_Configurable
         out Minimap.PinData match)
     {
       Mod.Log.LogDebug("Mod.SimilarPinExists");
-      var watch = System.Diagnostics.Stopwatch.StartNew();
+      DiagnosticUtils timer = new DiagnosticUtils();
+      timer.startTimer();
 
       foreach (Minimap.PinData pin in pins)
       {
         if (pos == pin.m_pos)
         {
           match = pin;
-          watch.Stop();
-          Mod.Log.LogDebug($"Mod.SimilarPinExists: Found Similar Pin. took {watch.ElapsedMilliseconds}ms");
+          Mod.Log.LogDebug($"Mod.SimilarPinExists: Found Similar Pin. took {timer.stopTimer()}ms");
           return true;
         }
         else if ((double)Utils.DistanceXZ(pos, pin.m_pos) < pinOverlapDistance.Value
@@ -330,14 +396,12 @@ namespace AMP_Configurable
             && (aName == pin.m_name || aIcon == pin.m_icon))
         {
           match = pin;
-          watch.Stop();
-          Mod.Log.LogDebug($"Mod.SimilarPinExists: Found Similar Pin. took {watch.ElapsedMilliseconds}ms");
+          Mod.Log.LogDebug($"Mod.SimilarPinExists: Found Similar Pin. took {timer.stopTimer()}ms");
           return true;
         }
       }
       match = null;
-      watch.Stop();
-      Mod.Log.LogDebug($"Mod.SimilarPinExists took {watch.ElapsedMilliseconds}ms");
+      Mod.Log.LogDebug($"Mod.SimilarPinExists took {timer.stopTimer()}ms");
       return false;
     }
 
@@ -366,7 +430,8 @@ namespace AMP_Configurable
       if (checkingPins) return;
       checkingPins = true;
       Mod.Log.LogDebug($"Mod.checkPins Looking for items to pin. Checking {pinItems.Count()} pinnable items");
-      var watch = System.Diagnostics.Stopwatch.StartNew();
+      DiagnosticUtils timer = new DiagnosticUtils();
+      timer.startTimer();
 
       // Compatibility check for pinRange. Other mods can change the exploreRadius 
       if (pinRangeExpRadiusMatching.Value)
@@ -412,8 +477,7 @@ namespace AMP_Configurable
         }
       }
 
-      watch.Stop();
-      Mod.Log.LogDebug($"Mod.checkPins took {watch.ElapsedMilliseconds}ms");
+      Mod.Log.LogDebug($"Mod.checkPins took {timer.stopTimer()}ms");
       checkingPins = false;
     }
 
@@ -454,12 +518,13 @@ namespace AMP_Configurable
     public static Minimap.PinData updatePin(Minimap.PinData pin)
     {
       Mod.Log.LogDebug($"PinnedObject.updatePin start");
-      var watch = System.Diagnostics.Stopwatch.StartNew();
+      DiagnosticUtils timer = new DiagnosticUtils();
+      timer.startTimer();
 
       loadData(null, (int)pin.m_type);
 
-      // If the pin is set to be hidden remove it from the map
-      if (hidePin)
+      // If the pin is set to be hidden remove it from the map, unless it's saved
+      if (hidePin && !pin.m_save)
       {
         Minimap.instance.RemovePin(pin);
         return null;
@@ -481,9 +546,7 @@ namespace AMP_Configurable
           Minimap.instance.RemovePin(pin);
       }
 
-      watch.Stop();
-      Mod.Log.LogDebug($"PinnedObject.updatePin took {watch.ElapsedMilliseconds}ms");
-
+      Mod.Log.LogDebug($"PinnedObject.updatePin took {timer.stopTimer()}ms");
       return pin;
     }
 
@@ -493,7 +556,8 @@ namespace AMP_Configurable
         return null;
 
       Mod.Log.LogDebug($"PinnedObject.pinOb start");
-      var watch = System.Diagnostics.Stopwatch.StartNew();
+      DiagnosticUtils timer = new DiagnosticUtils();
+      timer.startTimer();
 
       loadData(pinItem);
 
@@ -503,8 +567,7 @@ namespace AMP_Configurable
       if (Mod.SimilarPinExists(aPos, (Minimap.PinType)pType, Mod.autoPins, aName, aIcon, out Minimap.PinData similarPin))
       {
         Mod.dupPinLocs[aPos] = similarPin;
-        watch.Stop();
-        Mod.Log.LogDebug($"PinnedObject.pinOb took {watch.ElapsedMilliseconds}ms. Similar pin exists.");
+        Mod.Log.LogDebug($"PinnedObject.pinOb took {timer.stopTimer()}ms. Similar pin exists.");
         return similarPin;
       }
 
@@ -514,10 +577,7 @@ namespace AMP_Configurable
       pin.m_worldSize = pinSize;
       pin.m_save = aSave;
 
-      //Mod.autoPins.Add(pin);
-
-      watch.Stop();
-      Mod.Log.LogDebug($"PinnedObject.pinOb took {watch.ElapsedMilliseconds}ms. Added Pin");
+      Mod.Log.LogDebug($"PinnedObject.pinOb took {timer.stopTimer()}ms. Added Pin");
       return pin;
     }
 
@@ -529,7 +589,8 @@ namespace AMP_Configurable
         return;
 
       Mod.Log.LogDebug($"PinnedObject.OnDestroy on type {pin.m_type.ToString()}");
-      var watch = System.Diagnostics.Stopwatch.StartNew();
+      DiagnosticUtils timer = new DiagnosticUtils();
+      timer.startTimer();
 
       loadData(null, (int)pin.m_type);
 
@@ -540,16 +601,15 @@ namespace AMP_Configurable
       if (Mod.distanceFromPlayer(pin.m_pos) < Mod.pinRange.Value)
         return;
 
-      watch.Stop();
-      var elapsedMs = watch.ElapsedMilliseconds;
-      Mod.Log.LogDebug($"PinnedObject.OnDestroy took {elapsedMs}ms");
+      Mod.Log.LogDebug($"PinnedObject.OnDestroy took {timer.stopTimer()}ms");
     }
 
     public static void loadData(PinType pin = null, int m_type = 0)
     {
       string pinLabel = pin == null ? m_type.ToString() : pin.label;
       Mod.Log.LogDebug($"PinnedObject.loadData on type/label {pinLabel}");
-      var watch = System.Diagnostics.Stopwatch.StartNew();
+      DiagnosticUtils timer = new DiagnosticUtils();
+      timer.startTimer();
 
       /** loadData called with minimap pin type data **/
       if (pin == null && m_type > 0)
@@ -584,17 +644,25 @@ namespace AMP_Configurable
           break;
       }
 
-      hidePin = Mod.hidePinTypes.Value != "" && Mod.hidePinTypes.Value.Split(',').Contains(pin.label);
+      hidePin = Mod.hidePinTypes.Value != "" && Mod.hiddenObjectPins.Contains(pin.label);
 
       if(!Mod.destructablesEnabled.Value && pin.pinCat == "Destructable Resource") hidePin = true;
       if(!Mod.pickablesEnabled.Value && pin.pinCat == "Pickable") hidePin = true;
       if(!Mod.locsEnabled.Value && pin.pinCat == "Location") hidePin = true;
       if(!Mod.spwnsEnabled.Value && pin.pinCat == "Spawner") hidePin = true;
       if(!Mod.creaturesEnabled.Value && pin.pinCat == "Creature") hidePin = true;
+ 
+      if(
+        Mod.wishboneMode.Value != Mod.WishboneModes.disabled &&
+        !Player_Patches.hasWishbone &&
+        (
+          pin.object_ids.Contains("$piece_mudpile") ||
+          pin.object_ids.Contains("$piece_deposit_silver") || 
+          pin.object_ids.Contains("$piece_deposit_silvervein")
+        )
+      ) hidePin = true;
 
-      watch.Stop();
-      var elapsedMs = watch.ElapsedMilliseconds;
-      Mod.Log.LogDebug($"PinnedObject.loadData took {elapsedMs}ms");
+      Mod.Log.LogDebug($"PinnedObject.loadData took {timer.stopTimer()}ms");
     }
 
     public PinnedObject()
@@ -605,10 +673,17 @@ namespace AMP_Configurable
 
   public class Assets
   {
+    public static Dictionary<string, Sprite> loaded = null;
     public static void Init()
     {
+      if(loaded == null) loaded = new Dictionary<string, Sprite>();
       foreach (KeyValuePair<int, PinType> mtype in Mod.mtypePins)
-        mtype.Value.sprite = LoadSprite(mtype.Value.icon);
+      {
+        if(!loaded.ContainsKey(mtype.Value.icon))
+          loaded[mtype.Value.icon] = LoadSprite(mtype.Value.icon);
+
+        mtype.Value.sprite = loaded[mtype.Value.icon];
+      }
     }
 
     internal static Texture2D LoadTexture(byte[] file)

@@ -4,7 +4,7 @@ using BepInEx;
 using Newtonsoft.Json;
 using System.IO;
 using System.Reflection;
-using UnityEngine;
+using System.Diagnostics;
 
 namespace Utilities
 {
@@ -134,53 +134,28 @@ namespace Utilities
       Error,
       Unload,
     }
+  }
 
-    public static void Logz(string[] categories, string[] messages, LogType logType = LogType.Log)
+  class DiagnosticUtils
+  {
+    private static Stopwatch watch;
+
+    public DiagnosticUtils()
     {
-      string str = string.Empty;
-      if (categories != null)
-      {
-        foreach (string category in categories)
-          str = str + " (" + category + ") -> ";
-      }
-      if (messages != null)
-      {
-        foreach (string message in messages)
-          str = message == null ? str + "NULL | " : str + message + " | ";
-        str = str.Remove(str.Length - 2, 1);
-      }
-      if (!ConvertInternalWarningsErrors)
-      {
-        if (logType != LogType.Error)
-        {
-          if (logType == LogType.Warning)
-            Debug.LogWarning(("[AMP Commands]" + str));
-          else
-            Debug.Log(("[AMP Commands]" + str));
-        }
-        else
-          Debug.LogError(("[AMP Commands]" + str));
-      }
-      else
-        Debug.Log(("[AMP Commands]" + str));
+      return;
     }
 
-    public static string Logr(string[] categories, string[] messages)
+    public void startTimer() 
     {
-      string str = string.Empty;
-      if (categories != null)
-      {
-        foreach (string category in categories)
-          str = str + " (" + category + ")";
-      }
-      if (messages != null)
-      {
-        foreach (string message in messages)
-          str = message == null ? str + "NULL | " : str + message + " | ";
-        str = str.Remove(str.Length - 2, 1);
-      }
-      return "[AMP Commands]" + str;
+      if (Mod.diagnosticsEnabled.Value) return;
+      watch = Stopwatch.StartNew();
     }
 
+    public long stopTimer()
+    {
+      if (Mod.diagnosticsEnabled.Value) return 0;
+      watch.Stop();
+      return watch.ElapsedMilliseconds;
+    }
   }
 }

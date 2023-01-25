@@ -3,6 +3,7 @@ using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Utilities;
 
 namespace AMP_Configurable.Patches
 {
@@ -79,7 +80,7 @@ namespace AMP_Configurable.Patches
         Mod.pinItems[pin.m_pos].isPinned = false;
       }
 
-      if(Mod.dupPinLocs.ContainsKey(pin.m_pos)) Mod.dupPinLocs.Remove(pin.m_pos);
+      if (Mod.dupPinLocs.ContainsKey(pin.m_pos)) Mod.dupPinLocs.Remove(pin.m_pos);
       if (Mod.autoPins.Contains(pin)) Mod.autoPins.Remove(pin);
     }
 
@@ -91,7 +92,8 @@ namespace AMP_Configurable.Patches
       if (!checkedSavedPins)
       {
         Mod.Log.LogDebug("Minimap.UpdateProfilePins checking saved pins");
-        var watch = System.Diagnostics.Stopwatch.StartNew();
+        DiagnosticUtils timer = new DiagnosticUtils();
+        timer.startTimer();
         foreach (Minimap.PinData pin in ___m_pins)
         {
           if ((int)pin.m_type >= 100)
@@ -121,9 +123,7 @@ namespace AMP_Configurable.Patches
         checkedSavedPins = true;
 
         Mod.checkPins(true);
-        watch.Stop();
-        var elapsedMs = watch.ElapsedMilliseconds;
-        Mod.Log.LogDebug($"Minimap.UpdateProfilePins checking saved pins took {elapsedMs}ms");
+        Mod.Log.LogDebug($"Minimap.UpdateProfilePins checking saved pins took {timer.stopTimer()}ms");
       }
     }
 
@@ -154,20 +154,20 @@ namespace AMP_Configurable.Patches
       ref Minimap.MapMode ___m_mode)
     {
       Mod.Log.LogDebug($"Minimap.SetMapMode - Mode changed to {___m_mode}");
-      var watch = System.Diagnostics.Stopwatch.StartNew();
+      DiagnosticUtils timer = new DiagnosticUtils();
+      timer.startTimer();
 
       mapMode = ___m_mode;
       foreach (Minimap.PinData pin in Mod.autoPins)
       {
-        if(!Mod.mtypePins.TryGetValue((int)pin.m_type, out PinType typeConf)) continue;
+        if (!Mod.mtypePins.TryGetValue((int)pin.m_type, out PinType typeConf)) continue;
         float new_size = typeConf.size;
-        if (___m_mode == Minimap.MapMode.Small) 
+        if (___m_mode == Minimap.MapMode.Small)
           new_size = (typeConf.minimapSize != 0 ? typeConf.minimapSize : typeConf.size) * Mod.minimapSizeMult.Value;
 
         pin.m_worldSize = new_size;
       }
-      watch.Stop();
-      Mod.Log.LogDebug($"Minimap.SetMapMode timing {watch.ElapsedMilliseconds}ms");
+      Mod.Log.LogDebug($"Minimap.SetMapMode timing {timer.stopTimer()}ms");
     }
 
     [HarmonyPatch(typeof(Minimap), "OnMapRightClick")]
@@ -252,7 +252,7 @@ namespace AMP_Configurable.Patches
     [HarmonyPatch(typeof(SpawnArea), "Awake")]
     [HarmonyPostfix]
     private static void SpawnAreaSpawnPatch(ref Location __instance)
-      {
+    {
       if (!Mod.spwnsEnabled.Value) return;
       HoverText comp = __instance.GetComponent<HoverText>();
       if (!comp) return;
@@ -365,6 +365,41 @@ namespace AMP_Configurable.Patches
     public static Vector3 currPos;
     public static Vector3 prevPos;
     public const int interval = 120;
+    public static Player player = null;
+    public static bool hasWishbone = false;
+
+    public static void checkForWishbone()
+    {
+      if(player == null) return;
+      List<ItemDrop.ItemData> inventoryItems;
+      bool origHasWishbone = hasWishbone;
+
+      switch (Mod.wishboneMode.Value)
+      {
+        case Mod.WishboneModes.equipped:
+          inventoryItems = player.GetInventory().GetEquipedtems();
+          break;
+        case Mod.WishboneModes.inventory:
+          inventoryItems = player.GetInventory().GetAllItems();
+          break;
+        default:
+          hasWishbone = true;
+          if(origHasWishbone != hasWishbone) Mod.forcePinRefresh();
+          return;
+      }
+
+      hasWishbone = false;
+      foreach (ItemDrop.ItemData item in inventoryItems)
+      {
+        if (item.m_dropPrefab.name == "Wishbone")
+        {
+          hasWishbone = true;
+          break;
+        }
+      }
+
+      if(origHasWishbone != hasWishbone) Mod.forcePinRefresh();
+    }
 
     [HarmonyPatch(typeof(Player), "Awake")]
     internal class PlayerAwakePatch
@@ -374,8 +409,10 @@ namespace AMP_Configurable.Patches
         if (!Player.m_localPlayer || !__instance.IsOwner() || Game.IsPaused() || Mod.checkingPins)
           return;
 
-        currPos = __instance.transform.position;
-        prevPos = __instance.transform.position;
+        player = __instance;
+        currPos = player.transform.position;
+        prevPos = player.transform.position;
+        checkForWishbone();
       }
     }
 
@@ -390,7 +427,9 @@ namespace AMP_Configurable.Patches
 
         if (Time.frameCount % interval == 0)
         {
+          player = __instance;
           currPos = __instance.transform.position;
+          checkForWishbone();
           Mod.hasMoved = Vector3.Distance(currPos, prevPos) > 5;
         }
 
