@@ -9,11 +9,12 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>AMP_Configurable</RootNamespace>
     <AssemblyName>AMP_Configurable</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -34,18 +35,20 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony">
-      <HintPath>..\..\..\..\Steam\steamapps\common\Valheim\BepInEx\core\0Harmony.dll</HintPath>
+      <HintPath>..\Valheim\BepInEx\core\0Harmony.dll</HintPath>
+	  <HintPath>$(VALHEIM)\BepInEx\core\0Harmony.dll</HintPath>
     </Reference>
-    <Reference Include="assembly_utils, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\Steam\steamapps\common\Valheim\valheim_Data\Managed\assembly_utils.dll</HintPath>
+    <Reference Include="assembly_utils">
+      <HintPath>..\Valheim\valheim_Data\Managed\assembly_utils.dll</HintPath>
+	  <HintPath>$(VALHEIM)\valheim_Data\Managed\assembly_utils.dll</HintPath>
     </Reference>
-    <Reference Include="assembly_valheim, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\Steam\steamapps\common\Valheim\valheim_Data\Managed\assembly_valheim.dll</HintPath>
+    <Reference Include="assembly_valheim">
+      <HintPath>..\Valheim\valheim_Data\Managed\assembly_valheim.dll</HintPath>
+	  <HintPath>$(VALHEIM)\valheim_Data\Managed\assembly_valheim.dll</HintPath>
     </Reference>
     <Reference Include="BepInEx">
-      <HintPath>..\..\..\..\Steam\steamapps\common\Valheim\BepInEx\core\BepInEx.dll</HintPath>
+      <HintPath>..\Valheim\BepInEx\core\BepInEx.dll</HintPath>
+	  <HintPath>$(VALHEIM)\BepInEx\core\BepInEx.dll</HintPath>
     </Reference>
     <Reference Include="Mono.Cecil, Version=0.11.1.0, Culture=neutral, PublicKeyToken=50cebf1cceb9d05e, processorArchitecture=MSIL">
       <HintPath>..\packages\Mono.Cecil.0.11.1\lib\net40\Mono.Cecil.dll</HintPath>
@@ -72,26 +75,39 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
+    <Reference Include="gui_framework">
+	  <HintPath>..\Valheim\valheim_Data\Managed\gui_framework.dll</HintPath>
+	  <HintPath>$(VALHEIM)\valheim_Data\Managed\gui_framework.dll</HintPath>
+	</Reference>
+	<Reference Include="Unity.TextMeshPro">
+      <HintPath>..\Valheim\valheim_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+	  <HintPath>$(VALHEIM)\valheim_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+	</Reference>
     <Reference Include="UnityEngine, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\Steam\steamapps\common\Valheim\unstripped_corlib\UnityEngine.dll</HintPath>
-    </Reference>
+      <HintPath>..\Valheim\valheim_Data\Managed\UnityEngine.dll</HintPath>
+	  <HintPath>$(VALHEIM)\valheim_Data\Managed\UnityEngine.dll</HintPath>
+	</Reference>
     <Reference Include="UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\Steam\steamapps\common\Valheim\unstripped_corlib\UnityEngine.CoreModule.dll</HintPath>
-    </Reference>
+      <HintPath>..\Valheim\valheim_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+	  <HintPath>$(VALHEIM)\valheim_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+	</Reference>
     <Reference Include="UnityEngine.ImageConversionModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\Steam\steamapps\common\Valheim\unstripped_corlib\UnityEngine.ImageConversionModule.dll</HintPath>
-    </Reference>
+      <HintPath>..\Valheim\valheim_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+	  <HintPath>$(VALHEIM)\valheim_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+	</Reference>
     <Reference Include="UnityEngine.InputLegacyModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\Steam\steamapps\common\Valheim\unstripped_corlib\UnityEngine.InputLegacyModule.dll</HintPath>
-    </Reference>
+      <HintPath>..\Valheim\valheim_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+	  <HintPath>$(VALHEIM)\valheim_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+	</Reference>
     <Reference Include="UnityEngine.UI, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\Steam\steamapps\common\Valheim\unstripped_corlib\UnityEngine.UI.dll</HintPath>
-    </Reference>
+      <HintPath>..\Valheim\valheim_Data\Managed\UnityEngine.UI.dll</HintPath>
+	  <HintPath>$(VALHEIM)\valheim_Data\Managed\UnityEngine.UI.dll</HintPath>
+	</Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AMP_Configurable.cs" />
@@ -118,14 +134,10 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="Copy" AfterTargets="ILRepack">
-    <Exec Command="xcopy &quot;$(TargetDir)$(TargetFileName)&quot; &quot;C:\Users\Jordan\AppData\Roaming\r2modmanPlus-local\Valheim\profiles\Dev\BepInEx\plugins\raziell74-AMPED_Auto_Map_Pins_Enhanced\&quot; /q /y /i" />
     <Exec Command="xcopy &quot;$(TargetDir)$(TargetFileName)&quot; &quot;$(ProjectDir)\bin\Release\AMPED-AutoMapPinsEnhanced_v1.3.6\plugins\&quot; /q /y /i" />
   </Target>
   <PropertyGroup>
     <PostBuildEvent>
-xcopy "$(ProjectDir)\AMP_Enhanced\amp_pin_types.json" "C:\Users\Jordan\AppData\Roaming\r2modmanPlus-local\Valheim\profiles\Dev\BepInEx\plugins\raziell74-AMPED_Auto_Map_Pins_Enhanced\AMP_Enhanced\" /q /y /i
-xcopy "$(ProjectDir)\AMP_Enhanced\pin-icons" "C:\Users\Jordan\AppData\Roaming\r2modmanPlus-local\Valheim\profiles\Dev\BepInEx\plugins\raziell74-AMPED_Auto_Map_Pins_Enhanced\AMP_Enhanced\pin-icons\" /c /q /y /i
-
 xcopy "$(ProjectDir)\AMP_Enhanced\amp_pin_types.json" "$(ProjectDir)\bin\Release\AMPED-AutoMapPinsEnhanced_v1.3.6\plugins\AMP_Enhanced\" /q /y /i
 xcopy "$(ProjectDir)\AMP_Enhanced\pin-icons" "$(ProjectDir)\bin\Release\AMPED-AutoMapPinsEnhanced_v1.3.6\plugins\AMP_Enhanced\pin-icons" /c /q /y /i
 xcopy "$(ProjectDir)\..\icon.png" "$(ProjectDir)\bin\Release\AMPED-AutoMapPinsEnhanced_v1.3.6\" /q /y /i
