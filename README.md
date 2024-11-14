@@ -16,6 +16,9 @@ Contibutions from the following modders was invaluable and appreciated:
 
 # Change Log
 
+### Version v1.3.6
+  * Support for build 0.219.16
+
 ### Version v1.3.5
   * Performance Overhaul! Updated and refactored a large portion of the mod to run faster as to not cause as much FPS drops for potato computers. Lots of legacy code updated.
   * Updated and reorganized configuration. My sincerest apologies but this will require you to redo your configuration settings, my first go at it a lot of the naming is bad and would cause issues and I now know a ton more about the inner workings of BepInEx configurations. If you experience issues, delete your `amped.mod.auto_map_pins.cfg` and restart the game to generate a clean config. Thank you for your patience, this is my first time doing any BepInEx modding.
